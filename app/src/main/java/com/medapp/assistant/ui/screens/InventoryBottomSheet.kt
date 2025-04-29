@@ -25,7 +25,7 @@ import com.medapp.assistant.data.model.MedicineData
 import com.medapp.assistant.data.model.Medicine
 import com.medapp.assistant.data.model.InventoryMedicine
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.medapp.assistant.data.local.entities.InventoryItem
+import com.medapp.assistant.data.model.InventoryItem
 import com.medapp.assistant.ui.viewmodels.HomeViewModel
 import android.util.Log
 
@@ -34,11 +34,20 @@ import android.util.Log
 fun InventoryBottomSheet(onDismiss: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
     var selectedTab by remember { mutableStateOf(0) } // 0 = С собой, 1 = Имеется
     val inventory by viewModel.inventory.collectAsState()
+    
+    // Автоматически переключаемся на нужную вкладку при добавлении нового элемента
+    LaunchedEffect(inventory) {
+        if (inventory.isNotEmpty()) {
+            val lastItem = inventory.last()
+            selectedTab = if (lastItem.atHome) 1 else 0
+        }
+    }
+    
+    val withMe = inventory.filter { !it.atHome }
+    val atHome = inventory.filter { it.atHome }
     LaunchedEffect(inventory) {
         Log.d("Inventory", "Текущее состояние: $inventory")
     }
-    val withMe = inventory.filter { !it.atHome }
-    val atHome = inventory.filter { it.atHome }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)

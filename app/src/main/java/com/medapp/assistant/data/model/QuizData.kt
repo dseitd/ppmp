@@ -4,6 +4,7 @@ object QuizData {
     val firstAidQuiz = Quiz(
         id = 1L,
         title = "Тест по первой помощи",
+        description = "Базовый тест по оказанию первой помощи в полевых условиях",
         category = "Первая помощь",
         passingScore = 80,
         questions = listOf(

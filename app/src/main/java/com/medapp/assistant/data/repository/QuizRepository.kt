@@ -2,6 +2,7 @@ package com.medapp.assistant.data.repository
 
 import com.medapp.assistant.data.model.Quiz
 import com.medapp.assistant.data.model.QuizResult
+import kotlinx.coroutines.flow.Flow
 
 interface QuizRepository {
     suspend fun getAllQuizzes(): List<Quiz>
@@ -18,5 +19,7 @@ interface QuizRepository {
     
     suspend fun saveQuizResult(result: QuizResult)
     
-    suspend fun getQuizResults(userId: String): List<QuizResult>
+    fun getQuizResults(userId: String): Flow<List<QuizResult>>
+    
+    fun getQuizResultsByQuiz(quizId: Long, userId: String): Flow<List<QuizResult>>
 } 

@@ -63,12 +63,12 @@ fun NavGraph(navController: NavHostController) {
         }
         
         composable(
-            route = Screen.QuizDetail.route + "/{quizId}",
+            route = Screen.QuizDetail.route,
             arguments = listOf(
                 navArgument("quizId") { type = NavType.LongType }
             )
         ) { backStackEntry ->
-            val quizId = backStackEntry.arguments?.getLong("quizId") ?: return@composable
+            val quizId = backStackEntry.arguments?.getLong("quizId") ?: 1L
             QuizDetailScreen(navController = navController, quizId = quizId)
         }
         

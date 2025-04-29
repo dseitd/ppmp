@@ -41,117 +41,108 @@ import kotlin.math.min
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.clickable
+
+private fun interpolate(
+    value: Float,
+    inputRange: Pair<Float, Float>,
+    outputRange: Pair<Float, Float>
+): Float {
+    val (inputMin, inputMax) = inputRange
+    val (outputMin, outputMax) = outputRange
+    return outputMin + (outputMax - outputMin) * ((value - inputMin) / (inputMax - inputMin))
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FirstAidGuidesScreen(
-    navController: NavController
+    navController: NavController,
+    modifier: Modifier = Modifier,
+    viewModel: FirstAidGuidesViewModel = hiltViewModel()
 ) {
-    // Временный статический список руководств
-    val allGuides = remember {
-        listOf(
-            FirstAidGuide(1, "Остановка кровотечения", "Как быстро остановить кровотечение.", "...", null, "Травмы", emptyList(), 0L, false),
-            FirstAidGuide(2, "Первая помощь при ожогах", "Что делать при ожогах.", "...", null, "Ожоги", emptyList(), 0L, false),
-            FirstAidGuide(3, "Отравления", "Действия при отравлениях.", "...", null, "Отравления", emptyList(), 0L, false),
-            FirstAidGuide(4, "Первая помощь при переломах", "Как оказать помощь при переломах.", "...", null, "Травмы", emptyList(), 0L, false),
-            FirstAidGuide(5, "Обморок", "Что делать при потере сознания.", "...", null, "Общее", emptyList(), 0L, false)
+    val guides by viewModel.guides.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    var selectedGuide by remember { mutableStateOf<FirstAidGuide?>(null) }
+    
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Первая помощь",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(bottom = 16.dp)
         )
-    }
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
-    val categories = listOf("Все") + allGuides.map { it.category }.distinct()
-    val guideEntities = allGuides
-    val coroutineScope = rememberCoroutineScope()
-    val lazyRowState = rememberLazyRowState()
-    val listState = rememberLazyListState()
-    var userSelectedCategory by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    // Центрируем выбранную категорию
-    LaunchedEffect(selectedCategory) {
-        val idx = categories.indexOf(selectedCategory ?: "Все")
-        if (idx >= 0) {
-            coroutineScope.launch {
-                lazyRowState.animateScrollToItem(idx.coerceAtLeast(0))
+        
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
             }
-        }
-    }
-    // Синхронизация категории с центральной карточкой при скролле
-    LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, guideEntities) {
-        if (!userSelectedCategory && guideEntities.isNotEmpty()) {
-            val itemHeightPx = with(density) { 120.dp.toPx() }
-            val spacingPx = with(density) { 10.dp.toPx() }
-            val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-            val centerScreen = screenHeightPx / 2f
-            val firstVisible = listState.firstVisibleItemIndex
-            val scrollOffset = listState.firstVisibleItemScrollOffset.toFloat()
-            var closestIdx = firstVisible
-            var minDist = Float.MAX_VALUE
-            for (i in firstVisible until (firstVisible + 5).coerceAtMost(guideEntities.size)) {
-                val idxF = i.toFloat()
-                val fvF = firstVisible.toFloat()
-                val itemTop = (idxF - fvF) * itemHeightPx - scrollOffset + spacingPx * (idxF - fvF)
-                val itemCenter = itemTop + itemHeightPx / 2f
-                val dist = abs(centerScreen - itemCenter)
-                if (dist < minDist) {
-                    minDist = dist
-                    closestIdx = i
-                }
-            }
-            val centerCategory = guideEntities.getOrNull(closestIdx)?.category
-            if (centerCategory != null && centerCategory != selectedCategory) {
-                selectedCategory = centerCategory
-            }
-        }
-    }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Первая помощь", style = MaterialTheme.typography.headlineLarge) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            if (guideEntities.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Нет данных по руководствам",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Без анимации: просто список карточек
-                androidx.compose.foundation.lazy.LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(guideEntities) { guide ->
-                        GuideCard(guide = guide, onClick = { navController.navigate("first_aid_guide/${guide.id}") })
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(guides) { guide ->
+                    val isSelected = selectedGuide == guide
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize()
+                            .clickable { selectedGuide = if (isSelected) null else guide },
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = guide.title,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            if (isSelected) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = guide.description,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { navController.navigate(Screen.FirstAidGuides.route + "/${guide.id}") },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text("Подробнее")
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
 }
+
+data class FirstAidGuide(
+    val title: String,
+    val content: String
+)
+
+val firstAidGuides = listOf(
+    FirstAidGuide(
+        "Сердечный приступ",
+        "1. Вызовите скорую помощь\n2. Уложите пациента\n3. Расстегните стесняющую одежду\n4. Дайте таблетку нитроглицерина"
+    ),
+    FirstAidGuide(
+        "Потеря сознания",
+        "1. Проверьте дыхание\n2. Положите на бок\n3. Вызовите скорую помощь\n4. Контролируйте состояние"
+    ),
+    FirstAidGuide(
+        "Кровотечение",
+        "1. Наложите давящую повязку\n2. Приподнимите конечность\n3. При сильном кровотечении - наложите жгут\n4. Вызовите скорую помощь"
+    )
+)
 
 @Composable
 fun FirstAidAnimatedList(

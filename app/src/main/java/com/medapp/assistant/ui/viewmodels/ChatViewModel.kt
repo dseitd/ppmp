@@ -2,6 +2,9 @@ package com.medapp.assistant.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.medapp.assistant.data.remote.api.QwenMessage
+import com.medapp.assistant.data.remote.api.QwenRequest
+import com.medapp.assistant.data.remote.api.QwenService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,11 +30,23 @@ class ChatViewModel @Inject constructor() : ViewModel() {
             _isLoading.value = true
             _messages.value = _messages.value + ChatMessage(text, true)
             
-            // Здесь будет логика отправки сообщения в API
-            // Пока что просто эмулируем ответ
-            kotlinx.coroutines.delay(1000)
-            _messages.value = _messages.value + ChatMessage("Привет! Я ваш ассистент помощник", false)
-            _isLoading.value = false
+            try {
+                val response = QwenService.api.chatCompletion(
+                    QwenRequest(
+                        messages = listOf(QwenMessage("user", text))
+                    )
+                )
+                
+                val botReply = response.choices.firstOrNull()?.message?.content ?: "Извините, произошла ошибка"
+                _messages.value = _messages.value + ChatMessage(botReply, false)
+            } catch (e: Exception) {
+                _messages.value = _messages.value + ChatMessage(
+                    "Извините, произошла ошибка при обработке вашего запроса: ${e.localizedMessage}",
+                    false
+                )
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 } 

@@ -20,6 +20,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.medapp.assistant.data.model.QuizData
 import com.medapp.assistant.ui.viewmodels.QuizzesViewModel
 import androidx.compose.runtime.collectAsState
+import com.medapp.assistant.navigation.Screen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +49,34 @@ fun QuizListScreen(navController: NavController, viewModel: QuizzesViewModel = h
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
+            // Специальная карточка для теста по первой помощи
+            Card(
+                onClick = { navController.navigate(Screen.QuizDetail.route) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                shape = RoundedCornerShape(22.dp),
+                elevation = CardDefaults.cardElevation(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Quiz, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.width(24.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Тест по первой помощи", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("Проверьте свои знания по оказанию первой помощи", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -55,10 +84,9 @@ fun QuizListScreen(navController: NavController, viewModel: QuizzesViewModel = h
             } else if (error != null) {
                 Text("Ошибка загрузки тестов: $error", color = MaterialTheme.colorScheme.error)
             } else {
-                val quizList = if (quizzes.isNotEmpty()) quizzes else listOf(QuizData.firstAidQuiz)
-                quizList.forEach { quiz ->
+                quizzes.forEach { quiz ->
                     Card(
-                        onClick = { navController.navigate("quiz_detail/${quiz.id}") },
+                        onClick = { navController.navigate("${Screen.QuizDetail.route}?quizId=${quiz.id}") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(140.dp),

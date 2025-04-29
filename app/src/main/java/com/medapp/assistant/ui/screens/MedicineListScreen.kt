@@ -1,68 +1,66 @@
 package com.medapp.assistant.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.medapp.assistant.R
-import com.medapp.assistant.data.model.MedicineEntity
-import com.medapp.assistant.navigation.Screen
-import com.medapp.assistant.ui.viewmodels.MedicineListViewModel
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import com.medapp.assistant.data.local.entities.InventoryItemEntity
+import com.medapp.assistant.data.local.entities.MedicineEntity
+import com.medapp.assistant.data.model.MedicineCategory
 import com.medapp.assistant.data.model.MedicineData
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.graphics.graphicsLayer
+import com.medapp.assistant.navigation.Screen
+import com.medapp.assistant.ui.viewmodels.MedicineViewModel
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
-import androidx.compose.material.icons.filled.Medication
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed as lazyItemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState as rememberLazyRowState
-import kotlinx.coroutines.launch
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.ExperimentalMaterial3Api
+
+private fun interpolate(
+    value: Float,
+    inputRange: Pair<Float, Float>,
+    outputRange: Pair<Float, Float>
+): Float {
+    val (inputMin, inputMax) = inputRange
+    val (outputMin, outputMax) = outputRange
+    return outputMin + (outputMax - outputMin) * ((value - inputMin) / (inputMax - inputMin))
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicineListScreen(
     navController: NavController,
-    // viewModel: MedicineListViewModel = hiltViewModel() // Отключаем старый viewModel, работаем с MedicineData
+    modifier: Modifier = Modifier
 ) {
     val allMedicines = MedicineData.medicines
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var selectedCategory by remember { mutableStateOf("Все") }
     val categories = listOf("Все") + MedicineData.categories.map { it.name }
     val medicineEntities = allMedicines.map {
         MedicineEntity(
@@ -78,125 +76,77 @@ fun MedicineListScreen(
         )
     }
     val coroutineScope = rememberCoroutineScope()
-    val lazyRowState = rememberLazyRowState()
+    val lazyRowState = rememberLazyListState()
     val listState = rememberLazyListState()
     var userSelectedCategory by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
-    // BottomSheet state
     var selectedMedicine by remember { mutableStateOf<MedicineEntity?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // Центрируем выбранную категорию
+
+    LaunchedEffect(Unit) {
+        lazyRowState.animateScrollToItem(0)
+    }
+
     LaunchedEffect(selectedCategory) {
-        val idx = categories.indexOf(selectedCategory ?: "Все")
-        if (idx >= 0) {
+        val idx = categories.indexOf(selectedCategory)
+        if (idx > 0 && userSelectedCategory) {
             coroutineScope.launch {
-                lazyRowState.animateScrollToItem(idx.coerceAtLeast(0))
+                lazyRowState.animateScrollToItem(idx)
             }
         }
     }
-    // Синхронизация категории с центральной карточкой при скролле
-    LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, medicineEntities) {
-        if (!userSelectedCategory && medicineEntities.isNotEmpty()) {
-            val itemHeightPx = with(density) { 120.dp.toPx() }
-            val spacingPx = with(density) { 10.dp.toPx() }
-            val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-            val centerScreen = screenHeightPx / 2f
-            val firstVisible = listState.firstVisibleItemIndex
-            val scrollOffset = listState.firstVisibleItemScrollOffset.toFloat()
-            var closestIdx = firstVisible
-            var minDist = Float.MAX_VALUE
-            for (i in firstVisible until (firstVisible + 5).coerceAtMost(medicineEntities.size)) {
-                val idxF = i.toFloat()
-                val fvF = firstVisible.toFloat()
-                val itemTop = (idxF - fvF) * itemHeightPx - scrollOffset + spacingPx * (idxF - fvF)
-                val itemCenter = itemTop + itemHeightPx / 2f
-                val dist = abs(centerScreen - itemCenter)
-                if (dist < minDist) {
-                    minDist = dist
-                    closestIdx = i
-                }
-            }
-            val centerCategory = medicineEntities.getOrNull(closestIdx)?.category
-            if (centerCategory != null && centerCategory != selectedCategory) {
-                selectedCategory = centerCategory
-            }
-        }
-    }
+
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Медикаменты", style = MaterialTheme.typography.headlineLarge) },
+                title = { Text("Медикаменты") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
+                }
             )
         }
-    ) { paddingValues ->
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
+                .padding(padding)
         ) {
-            // Категории — горизонтальный LazyRow с автоцентрированием и подсветкой
             LazyRow(
                 state = lazyRowState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                lazyItemsIndexed(categories) { idx, category ->
-                    val isSelected = selectedCategory == category || (selectedCategory == null && category == "Все")
+                items(categories) { category ->
                     FilterChip(
-                        selected = isSelected,
+                        selected = category == selectedCategory,
                         onClick = {
-                            selectedCategory = if (category == "Все") null else category
                             userSelectedCategory = true
-                            coroutineScope.launch {
-                                // Через 500мс сбрасываем userSelectedCategory, чтобы снова синхронизировать с прокруткой
-                                kotlinx.coroutines.delay(500)
-                                userSelectedCategory = false
-                            }
+                            selectedCategory = category
                         },
                         label = { Text(category) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                         )
                     )
                 }
             }
-            if (medicineEntities.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Нет данных по медикаментам",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                MedicineAnimatedList(
-                    medicines = medicineEntities,
-                    navController = navController,
-                    listState = listState,
-                    onMedicineClick = { selectedMedicine = it }
-                )
-            }
+
+            MedicineAnimatedList(
+                medicines = medicineEntities.filter { medicine ->
+                    selectedCategory == "Все" || selectedCategory == medicine.category
+                },
+                navController = navController,
+                listState = listState,
+                onMedicineClick = { selectedMedicine = it }
+            )
         }
-        // BottomSheet
+
         if (selectedMedicine != null) {
             var addedCount by remember { mutableStateOf<Int?>(null) }
             ModalBottomSheet(
@@ -221,7 +171,6 @@ fun MedicineListScreen(
                         Button(
                             onClick = {
                                 addedCount = 1
-                                // Добавляем в отслеживаемые, если ещё не добавлен
                                 val med = MedicineData.medicines.find { it.name == selectedMedicine!!.name }
                                 if (med != null && MedicineData.trackedMedicines.none { it.medicine.name == med.name }) {
                                     MedicineData.trackedMedicines.add(com.medapp.assistant.data.model.InventoryMedicine(med, atHome = false))
@@ -275,6 +224,7 @@ fun MedicineAnimatedList(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val spacingPx = with(density) { spacing.toPx() }
+
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
@@ -296,16 +246,20 @@ fun MedicineAnimatedList(
                 val scale = max(0.92f, 1f - norm * 0.12f)
                 val alpha = max(0.5f, 1f - norm * 0.7f)
                 val translateY = interpolate(
-                    norm,
-                    inputRange = 0f to 1f,
-                    outputRange = 0f to 30f
+                    value = norm,
+                    inputRange = Pair(0f, 1f),
+                    outputRange = Pair(0f, 30f)
                 )
+
                 MedicineCardAnimated(
                     medicine = medicine,
                     color = cardColor,
                     height = itemHeight,
                     onClick = { onMedicineClick(medicine) },
                     modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = itemHeight)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                         .graphicsLayer {
                             this.alpha = alpha
                             this.scaleX = scale
@@ -316,13 +270,6 @@ fun MedicineAnimatedList(
             }
         }
     }
-}
-
-fun interpolate(value: Float, inputRange: Pair<Float, Float>, outputRange: Pair<Float, Float>): Float {
-    val (inMin, inMax) = inputRange
-    val (outMin, outMax) = outputRange
-    val t = ((value - inMin) / (inMax - inMin)).coerceIn(0f, 1f)
-    return outMin + (outMax - outMin) * t
 }
 
 @Composable
@@ -379,70 +326,6 @@ fun MedicineCardAnimated(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun ModernMedicineCard(
-    medicine: MedicineEntity,
-    onClick: () -> Unit,
-    onAddToPersonal: () -> Unit
-) {
-    val isExpiringSoon = remember(medicine.expiry) {
-        // Пример: если срок годности содержит "2024" — выделить
-        medicine.expiry.contains("2024")
-    }
-    Card(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 110.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isExpiringSoon) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(8.dp),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.Medication,
-                contentDescription = null,
-                tint = if (isExpiringSoon) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(40.dp)
-            )
-            Spacer(modifier = Modifier.width(20.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = medicine.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = medicine.forms.joinToString(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Срок годности: ${medicine.expiry}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isExpiringSoon) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(onClick = onAddToPersonal) {
-                Icon(
-                    imageVector = if (medicine.isPersonal) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = if (medicine.isPersonal) "Убрать из личных" else "В личные",
-                    tint = if (medicine.isPersonal) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }

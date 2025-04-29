@@ -5,13 +5,13 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.medapp.assistant.data.model.MedicineEntity
 import com.medapp.assistant.data.repository.MedicineRepository
 import com.medapp.assistant.data.repository.FirstAidGuidesRepository
 import com.medapp.assistant.data.repository.QuizRepository
 import com.medapp.assistant.data.local.JsonStorage
-import com.medapp.assistant.data.local.entities.InventoryItem
-import com.medapp.assistant.data.local.entities.ChatMessage
+import com.medapp.assistant.data.model.InventoryItem
+import com.medapp.assistant.data.model.ChatMessage
+import com.medapp.assistant.data.events.MedicineEvents
 import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,13 +19,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.medapp.assistant.data.local.entities.MedicineEntity
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     application: Application,
     private val medicineRepository: MedicineRepository,
     private val firstAidGuidesRepository: FirstAidGuidesRepository,
-    private val quizRepository: QuizRepository
+    private val quizRepository: QuizRepository,
+    private val medicineEvents: MedicineEvents
 ) : AndroidViewModel(application) {
 
     private val _medicineCount = MutableStateFlow(0)
@@ -60,28 +62,35 @@ class HomeViewModel @Inject constructor(
         loadPersonalMedicines()
         loadInventory()
         loadChatHistory()
+        
+        // Подписываемся на события обновления списка личных медикаментов
+        viewModelScope.launch {
+            medicineEvents.refreshPersonalMedicines.collect {
+                refreshPersonalMedicines()
+            }
+        }
     }
 
     private fun loadCounts() {
         viewModelScope.launch {
             try {
-                // Загрузка количества медикаментов
-                val medicines = medicineRepository.getAllMedicines()
-                _medicineCount.value = medicines.size
-
-                // Загрузка количества руководств по первой помощи
-                val guides = firstAidGuidesRepository.getAllGuides()
-                _firstAidCount.value = guides.size
-
-                // Загрузка количества тестов
-                val quizzes = quizRepository.getAllQuizzes()
-                _quizCount.value = quizzes.size
-
-                // Загрузка количества отслеживаемых медикаментов
-                val personalMedicines = medicineRepository.getPersonalMedicines()
-                _trackingCount.value = personalMedicines.size
+                medicineRepository.getAllMedicinesFlow().collect { medicines ->
+                    _medicineCount.value = medicines.size
+                }
+                
+                firstAidGuidesRepository.getAllGuides().let { guides ->
+                    _firstAidCount.value = guides.size
+                }
+                
+                quizRepository.getAllQuizzes().let { quizzes ->
+                    _quizCount.value = quizzes.size
+                }
+                
+                medicineRepository.getPersonalMedicinesFlow().collect { (medicines, _) ->
+                    _trackingCount.value = medicines.size
+                }
             } catch (e: Exception) {
-                // Обработка ошибок загрузки
+                Log.e("HomeViewModel", "Error loading counts", e)
             }
         }
     }
@@ -115,7 +124,12 @@ class HomeViewModel @Inject constructor(
     fun addInventoryItem(item: InventoryItem) {
         val list = _inventory.value.toMutableList()
         val idx = list.indexOfFirst { it.id == item.id }
-        if (idx >= 0) list[idx] = item else list.add(item)
+        if (idx >= 0) {
+            list[idx] = item
+        } else {
+            // При добавлении нового элемента, по умолчанию он добавляется в "С собой"
+            list.add(item.copy(atHome = false))
+        }
         _inventory.value = list
         JsonStorage.saveList(getApplication(), inventoryFile, list)
     }
@@ -141,5 +155,16 @@ class HomeViewModel @Inject constructor(
         _chatHistory.value = list
         JsonStorage.saveList(getApplication(), chatFile, list)
         Log.d("ChatHistory", "Сохранено: $list")
+    }
+
+    fun refreshPersonalMedicines() {
+        viewModelScope.launch {
+            try {
+                loadPersonalMedicines()
+                loadCounts() // Refresh counts as well
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error refreshing personal medicines", e)
+            }
+        }
     }
 } 

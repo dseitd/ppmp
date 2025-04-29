@@ -2,8 +2,8 @@ package com.medapp.assistant.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.medapp.assistant.data.model.MedicineEntity
 import com.medapp.assistant.data.repository.MedicineRepository
+import com.medapp.assistant.data.local.entities.MedicineEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

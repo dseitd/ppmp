@@ -1,6 +1,6 @@
 package com.medapp.assistant.data.remote.api
 
-import com.medapp.assistant.data.model.MedicineEntity
+import com.medapp.assistant.data.local.entities.MedicineEntity
 import retrofit2.http.*
 
 interface MedicineApi {

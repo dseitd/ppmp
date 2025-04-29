@@ -1,17 +1,16 @@
 package com.medapp.assistant.data.model
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 import com.google.gson.annotations.SerializedName
 
-@Entity(tableName = "quizzes")
 data class Quiz(
-    @PrimaryKey
     @SerializedName("id")
     val id: Long,
     
     @SerializedName("title")
     val title: String,
+    
+    @SerializedName("description")
+    val description: String,
     
     @SerializedName("category")
     val category: String,
@@ -22,7 +21,11 @@ data class Quiz(
     @SerializedName("passingScore")
     val passingScore: Int, // percentage needed to pass
     
-    val isOffline: Boolean = false
+    @SerializedName("isOffline")
+    val isOffline: Boolean = false,
+    
+    @SerializedName("lastUpdated")
+    val lastUpdated: Long = System.currentTimeMillis()
 ) {
     data class Question(
         @SerializedName("id")
@@ -45,6 +48,7 @@ data class Quiz(
 val BasicFirstAidQuiz = Quiz(
     id = 1L,
     title = "Базовый тест первой помощи",
+    description = "",
     category = "Первая помощь",
     questions = listOf(
         Quiz.Question(

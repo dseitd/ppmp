@@ -6,12 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.medapp.assistant.data.model.Quiz
 import com.medapp.assistant.data.model.QuizResult
 import com.medapp.assistant.data.repository.QuizRepository
+import com.medapp.assistant.data.model.QuizData
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.Date
 import javax.inject.Inject
 
 @HiltViewModel
@@ -42,10 +42,18 @@ class QuizDetailViewModel @Inject constructor(
             _isLoading.value = true
             try {
                 val result = repository.getQuizById(quizId)
-                _quiz.value = result
+                if (result == null && quizId == 1L) {
+                    // Если это тест по первой помощи и он не найден, используем встроенный тест
+                    _quiz.value = QuizData.firstAidQuiz
+                } else {
+                    _quiz.value = result
+                }
                 _startTime.value = System.currentTimeMillis()
             } catch (e: Exception) {
-                // Handle error
+                // В случае ошибки для теста по первой помощи используем встроенный тест
+                if (quizId == 1L) {
+                    _quiz.value = QuizData.firstAidQuiz
+                }
             } finally {
                 _isLoading.value = false
             }
@@ -94,7 +102,7 @@ class QuizDetailViewModel @Inject constructor(
                 totalQuestions = quiz.questions.size,
                 correctAnswers = correctAnswers,
                 timeSpent = timeSpent.toInt(),
-                completedAt = Date(),
+                completedAt = System.currentTimeMillis(),
                 answers = answers,
                 isPassed = score >= quiz.passingScore
             )

@@ -10,7 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.medapp.assistant.data.model.MedicineEntity
+import com.medapp.assistant.data.local.entities.MedicineEntity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.Animatable
@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.delay
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.medapp.assistant.ui.viewmodels.MedicineListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

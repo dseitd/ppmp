@@ -9,7 +9,7 @@ interface QuizApi {
     suspend fun getAllQuizzes(): List<Quiz>
 
     @GET("quizzes/{id}")
-    suspend fun getQuizById(@Path("id") id: Long): Quiz
+    suspend fun getQuizById(@Path("id") id: Long): Quiz?
 
     @GET("quizzes/category/{category}")
     suspend fun getQuizzesByCategory(@Path("category") category: String): List<Quiz>

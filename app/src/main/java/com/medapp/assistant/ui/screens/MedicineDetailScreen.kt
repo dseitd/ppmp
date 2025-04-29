@@ -18,7 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.medapp.assistant.data.model.MedicineEntity
+import com.medapp.assistant.data.local.entities.MedicineEntity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.medapp.assistant.ui.viewmodels.MedicineDetailViewModel
 import androidx.compose.foundation.background

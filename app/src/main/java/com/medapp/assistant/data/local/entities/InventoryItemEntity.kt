@@ -1,12 +1,14 @@
 package com.medapp.assistant.data.local.entities
 
-import kotlinx.serialization.Serializable
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
-@Serializable
-data class InventoryItem(
-    val id: Long = System.currentTimeMillis(),
+@Entity(tableName = "inventory_items")
+data class InventoryItemEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
     val name: String,
     val quantity: Int,
-    val expiry: String? = null,
-    val atHome: Boolean = false
+    val expiry: String,
+    val atHome: Boolean // true - дома, false - с собой
 ) 

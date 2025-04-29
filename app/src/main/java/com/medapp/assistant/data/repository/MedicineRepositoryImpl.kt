@@ -1,14 +1,18 @@
 package com.medapp.assistant.data.repository
 
 import com.medapp.assistant.data.cache.CacheManager
-import com.medapp.assistant.data.db.dao.MedicineDao
-import com.medapp.assistant.data.model.MedicineEntity
+import com.medapp.assistant.data.local.dao.MedicineDao
+import com.medapp.assistant.data.local.entities.MedicineEntity
 import com.medapp.assistant.data.remote.api.MedicineApi
+import com.medapp.assistant.data.model.MedicineData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -28,164 +32,85 @@ class MedicineRepositoryImpl @Inject constructor(
     private val cacheManager: CacheManager
 ) : MedicineRepository {
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
-    override fun getAllMedicinesFlow(): Flow<Pair<List<MedicineEntity>, CacheState>> = flow {
-        val cachedMedicines = medicineDao.getAllMedicines()
-        val lastUpdateTime = cachedMedicines.maxOfOrNull { it.lastUpdateTime } ?: 0L
-        val cacheState = CacheState(
-            isFromCache = true,
-            lastUpdateTime = lastUpdateTime,
-            isCacheValid = cacheManager.isCacheValid(lastUpdateTime)
-        )
-        emit(cachedMedicines to cacheState)
-        
-        if (!cacheState.isCacheValid) {
-            try {
-                val medicines = medicineApi.getAllMedicines().map { 
-                    it.copy(lastUpdateTime = System.currentTimeMillis())
-                }
-                medicineDao.insertMedicines(medicines)
-                emit(medicines to CacheState(
-                    isFromCache = false,
-                    lastUpdateTime = System.currentTimeMillis(),
-                    isCacheValid = true
-                ))
-            } catch (e: Exception) {
-                // В случае ошибки продолжаем использовать кэшированные данные
+    init {
+        // Инициализируем базу данных тестовыми данными
+        initializeTestData()
+    }
+
+    private fun initializeTestData() {
+        MedicineData.medicines.forEach { medicine ->
+            coroutineScope.launch {
+                val entity = MedicineEntity(
+                    name = medicine.name,
+                    category = medicine.category,
+                    forms = medicine.forms,
+                    usage = medicine.usage,
+                    dosage = medicine.dosage,
+                    expiry = medicine.expiry,
+                    quantity = medicine.quantity,
+                    isPersonal = false,
+                    lastUpdateTime = System.currentTimeMillis()
+                )
+                medicineDao.insert(entity)
             }
         }
-    }.flowOn(Dispatchers.IO)
+    }
+
+    override fun getAllMedicinesFlow(): Flow<List<MedicineEntity>> = medicineDao.getAll()
 
     override suspend fun getAllMedicines(): List<MedicineEntity> = withContext(Dispatchers.IO) {
         try {
             val medicines = medicineApi.getAllMedicines()
-            medicineDao.insertMedicines(medicines)
+            medicines.forEach { medicineDao.insert(it) }
             medicines
         } catch (e: Exception) {
-            medicineDao.getAllMedicines()
+            medicineDao.getAll().first()
         }
     }
 
-    override fun getMedicineByIdFlow(id: Long): Flow<Pair<MedicineEntity?, CacheState>> = flow {
-        val cachedMedicine = medicineDao.getMedicineById(id)
-        val lastUpdateTime = cachedMedicine?.lastUpdateTime ?: 0L
-        val cacheState = CacheState(
-            isFromCache = true,
-            lastUpdateTime = lastUpdateTime,
-            isCacheValid = cacheManager.isCacheValid(lastUpdateTime)
-        )
-        emit(cachedMedicine to cacheState)
-        
-        if (!cacheState.isCacheValid) {
-            try {
-                val medicine = medicineApi.getMedicineById(id)?.copy(
-                    lastUpdateTime = System.currentTimeMillis()
-                )
-                if (medicine != null) {
-                    medicineDao.insertMedicine(medicine)
-                    emit(medicine to CacheState(
-                        isFromCache = false,
-                        lastUpdateTime = System.currentTimeMillis(),
-                        isCacheValid = true
-                    ))
-                }
-            } catch (e: Exception) {
-                // В случае ошибки продолжаем использовать кэшированные данные
-            }
-        }
-    }.flowOn(Dispatchers.IO)
-
     override suspend fun getMedicineById(id: Long): MedicineEntity? = withContext(Dispatchers.IO) {
-        medicineDao.getMedicineById(id) ?: try {
+        medicineDao.getById(id) ?: try {
             medicineApi.getMedicineById(id)?.also {
-                medicineDao.insertMedicine(it)
+                medicineDao.insert(it)
             }
         } catch (e: Exception) {
             null
         }
     }
 
-    override fun getMedicinesByTypeFlow(type: String): Flow<Pair<List<MedicineEntity>, CacheState>> = flow {
-        val cachedMedicines = medicineDao.getMedicinesByType(type)
-        val lastUpdateTime = cachedMedicines.maxOfOrNull { it.lastUpdateTime } ?: 0L
-        val cacheState = CacheState(
-            isFromCache = true,
-            lastUpdateTime = lastUpdateTime,
-            isCacheValid = cacheManager.isCacheValid(lastUpdateTime)
-        )
-        emit(cachedMedicines to cacheState)
-        
-        if (!cacheState.isCacheValid) {
-            try {
-                val medicines = medicineApi.getMedicinesByType(type).map { 
-                    it.copy(lastUpdateTime = System.currentTimeMillis())
-                }
-                medicineDao.insertMedicines(medicines)
-                emit(medicines to CacheState(
-                    isFromCache = false,
-                    lastUpdateTime = System.currentTimeMillis(),
-                    isCacheValid = true
-                ))
-            } catch (e: Exception) {
-                // В случае ошибки продолжаем использовать кэшированные данные
-            }
-        }
-    }.flowOn(Dispatchers.IO)
+    override fun getMedicinesByTypeFlow(type: String): Flow<List<MedicineEntity>> = medicineDao.getByCategory(type)
 
     override suspend fun getMedicinesByType(type: String): List<MedicineEntity> = withContext(Dispatchers.IO) {
         try {
             val medicines = medicineApi.getMedicinesByType(type)
-            medicineDao.insertMedicines(medicines)
+            medicines.forEach { medicineDao.insert(it) }
             medicines
         } catch (e: Exception) {
-            medicineDao.getMedicinesByType(type)
+            medicineDao.getByCategory(type).first()
         }
     }
 
-    override fun searchMedicinesFlow(query: String): Flow<Pair<List<MedicineEntity>, CacheState>> = flow {
-        val cachedMedicines = medicineDao.searchMedicines(query)
-        val lastUpdateTime = cachedMedicines.maxOfOrNull { it.lastUpdateTime } ?: 0L
-        val cacheState = CacheState(
-            isFromCache = true,
-            lastUpdateTime = lastUpdateTime,
-            isCacheValid = cacheManager.isCacheValid(lastUpdateTime)
-        )
-        emit(cachedMedicines to cacheState)
-        
-        if (!cacheState.isCacheValid) {
-            try {
-                val medicines = medicineApi.searchMedicines(query).map { 
-                    it.copy(lastUpdateTime = System.currentTimeMillis())
-                }
-                medicineDao.insertMedicines(medicines)
-                emit(medicines to CacheState(
-                    isFromCache = false,
-                    lastUpdateTime = System.currentTimeMillis(),
-                    isCacheValid = true
-                ))
-            } catch (e: Exception) {
-                // В случае ошибки продолжаем использовать кэшированные данные
-            }
-        }
-    }.flowOn(Dispatchers.IO)
+    override fun searchMedicinesFlow(query: String): Flow<List<MedicineEntity>> = medicineDao.search(query)
 
     override suspend fun searchMedicines(query: String): List<MedicineEntity> = withContext(Dispatchers.IO) {
         try {
             val medicines = medicineApi.searchMedicines(query)
-            medicineDao.insertMedicines(medicines)
+            medicines.forEach { medicineDao.insert(it) }
             medicines
         } catch (e: Exception) {
-            medicineDao.searchMedicines(query)
+            medicineDao.search(query).first()
         }
     }
 
     override suspend fun addMedicine(medicine: MedicineEntity): MedicineEntity = withContext(Dispatchers.IO) {
         try {
             val addedMedicine = medicineApi.addMedicine(medicine)
-            medicineDao.insertMedicine(addedMedicine)
+            medicineDao.insert(addedMedicine)
             addedMedicine
         } catch (e: Exception) {
-            medicineDao.insertMedicine(medicine)
+            medicineDao.insert(medicine)
             medicine
         }
     }
@@ -193,10 +118,10 @@ class MedicineRepositoryImpl @Inject constructor(
     override suspend fun updateMedicine(medicine: MedicineEntity): MedicineEntity = withContext(Dispatchers.IO) {
         try {
             val updatedMedicine = medicineApi.updateMedicine(medicine.id, medicine)
-            medicineDao.updateMedicine(updatedMedicine)
+            medicineDao.update(updatedMedicine)
             updatedMedicine
         } catch (e: Exception) {
-            medicineDao.updateMedicine(medicine)
+            medicineDao.update(medicine)
             medicine
         }
     }
@@ -204,15 +129,14 @@ class MedicineRepositoryImpl @Inject constructor(
     override suspend fun deleteMedicine(id: Long, medicine: MedicineEntity) = withContext(Dispatchers.IO) {
         try {
             medicineApi.deleteMedicine(id)
-            medicineDao.deleteMedicine(id)
+            medicineDao.deleteById(id)
         } catch (e: Exception) {
-            medicineDao.deleteMedicine(id)
+            medicineDao.deleteById(id)
         }
     }
 
     override fun getExpiringMedicinesFlow(): Flow<Pair<List<MedicineEntity>, CacheState>> = flow {
-        val today = dateFormat.format(Date())
-        val cachedMedicines = medicineDao.getMedicinesExpiringBefore(today)
+        val cachedMedicines = medicineDao.getExpiringBefore(dateFormat.format(Date())).first()
         val lastUpdateTime = cachedMedicines.maxOfOrNull { it.lastUpdateTime } ?: 0L
         val cacheState = CacheState(
             isFromCache = true,
@@ -223,10 +147,8 @@ class MedicineRepositoryImpl @Inject constructor(
         
         if (!cacheState.isCacheValid) {
             try {
-                val medicines = medicineApi.getExpiringMedicines(today).map { 
-                    it.copy(lastUpdateTime = System.currentTimeMillis())
-                }
-                medicineDao.insertMedicines(medicines)
+                val medicines = medicineApi.getExpiringMedicines(dateFormat.format(Date()))
+                medicines.forEach { medicineDao.insert(it) }
                 emit(medicines to CacheState(
                     isFromCache = false,
                     lastUpdateTime = System.currentTimeMillis(),
@@ -239,34 +161,17 @@ class MedicineRepositoryImpl @Inject constructor(
     }.flowOn(Dispatchers.IO)
 
     override suspend fun getExpiringMedicines(): List<MedicineEntity> = withContext(Dispatchers.IO) {
-        val today = dateFormat.format(Date())
         try {
-            val medicines = medicineApi.getExpiringMedicines(today)
-            medicineDao.insertMedicines(medicines)
+            val medicines = medicineApi.getExpiringMedicines(dateFormat.format(Date()))
+            medicines.forEach { medicineDao.insert(it) }
             medicines
         } catch (e: Exception) {
-            medicineDao.getMedicinesExpiringBefore(today)
+            medicineDao.getExpiringBefore(dateFormat.format(Date())).first()
         }
     }
 
     override fun getPersonalMedicinesFlow(): Flow<Pair<List<MedicineEntity>, CacheState>> = flow {
-        val cachedMedicines = medicineDao.getMedicinesByPersonal(true)
-        val lastUpdateTime = cachedMedicines.maxOfOrNull { it.lastUpdateTime } ?: 0L
-        val cacheState = CacheState(
-            isFromCache = true,
-            lastUpdateTime = lastUpdateTime,
-            isCacheValid = cacheManager.isCacheValid(lastUpdateTime)
-        )
-        emit(cachedMedicines to cacheState)
-    }.flowOn(Dispatchers.IO)
-
-    override suspend fun getPersonalMedicines(): List<MedicineEntity> = withContext(Dispatchers.IO) {
-        medicineDao.getMedicinesByPersonal(true)
-    }
-
-    override fun getMedicinesExpiringBeforeFlow(date: Date): Flow<Pair<List<MedicineEntity>, CacheState>> = flow {
-        val formattedDate = dateFormat.format(date)
-        val cachedMedicines = medicineDao.getMedicinesExpiringBefore(formattedDate)
+        val cachedMedicines = medicineDao.getByPersonal(true).first()
         val lastUpdateTime = cachedMedicines.maxOfOrNull { it.lastUpdateTime } ?: 0L
         val cacheState = CacheState(
             isFromCache = true,
@@ -277,10 +182,43 @@ class MedicineRepositoryImpl @Inject constructor(
         
         if (!cacheState.isCacheValid) {
             try {
-                val medicines = medicineApi.getExpiringMedicines(formattedDate).map { 
-                    it.copy(lastUpdateTime = System.currentTimeMillis())
-                }
-                medicineDao.insertMedicines(medicines)
+                val medicines = medicineApi.getMedicinesByType("personal")
+                medicines.forEach { medicineDao.insert(it) }
+                emit(medicines to CacheState(
+                    isFromCache = false,
+                    lastUpdateTime = System.currentTimeMillis(),
+                    isCacheValid = true
+                ))
+            } catch (e: Exception) {
+                // В случае ошибки продолжаем использовать кэшированные данные
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    override suspend fun getPersonalMedicines(): List<MedicineEntity> = withContext(Dispatchers.IO) {
+        try {
+            val medicines = medicineApi.getMedicinesByType("personal")
+            medicines.forEach { medicineDao.insert(it) }
+            medicines
+        } catch (e: Exception) {
+            medicineDao.getByPersonal(true).first()
+        }
+    }
+
+    override fun getMedicinesExpiringBeforeFlow(date: Date): Flow<Pair<List<MedicineEntity>, CacheState>> = flow {
+        val cachedMedicines = medicineDao.getExpiringBefore(dateFormat.format(date)).first()
+        val lastUpdateTime = cachedMedicines.maxOfOrNull { it.lastUpdateTime } ?: 0L
+        val cacheState = CacheState(
+            isFromCache = true,
+            lastUpdateTime = lastUpdateTime,
+            isCacheValid = cacheManager.isCacheValid(lastUpdateTime)
+        )
+        emit(cachedMedicines to cacheState)
+        
+        if (!cacheState.isCacheValid) {
+            try {
+                val medicines = medicineApi.getExpiringMedicines(dateFormat.format(date))
+                medicines.forEach { medicineDao.insert(it) }
                 emit(medicines to CacheState(
                     isFromCache = false,
                     lastUpdateTime = System.currentTimeMillis(),
@@ -293,26 +231,47 @@ class MedicineRepositoryImpl @Inject constructor(
     }.flowOn(Dispatchers.IO)
 
     override suspend fun getMedicinesExpiringBefore(date: Date): List<MedicineEntity> = withContext(Dispatchers.IO) {
-        val formattedDate = dateFormat.format(date)
         try {
-            val medicines = medicineApi.getExpiringMedicines(formattedDate)
-            medicineDao.insertMedicines(medicines)
+            val medicines = medicineApi.getExpiringMedicines(dateFormat.format(date))
+            medicines.forEach { medicineDao.insert(it) }
             medicines
         } catch (e: Exception) {
-            medicineDao.getMedicinesExpiringBefore(formattedDate)
+            medicineDao.getExpiringBefore(dateFormat.format(date)).first()
         }
     }
 
     override fun getLowQuantityMedicinesFlow(): Flow<Pair<List<MedicineEntity>, CacheState>> = flow {
-        val cachedMedicines = emptyList<MedicineEntity>() // Implement when quantity field is added
-        emit(cachedMedicines to CacheState(
+        val cachedMedicines = medicineDao.getLowQuantity().first()
+        val lastUpdateTime = cachedMedicines.maxOfOrNull { it.lastUpdateTime } ?: 0L
+        val cacheState = CacheState(
             isFromCache = true,
-            lastUpdateTime = System.currentTimeMillis(),
-            isCacheValid = true
-        ))
+            lastUpdateTime = lastUpdateTime,
+            isCacheValid = cacheManager.isCacheValid(lastUpdateTime)
+        )
+        emit(cachedMedicines to cacheState)
+        
+        if (!cacheState.isCacheValid) {
+            try {
+                val medicines = medicineApi.getAllMedicines().filter { it.quantity < 5 }
+                medicines.forEach { medicineDao.insert(it) }
+                emit(medicines to CacheState(
+                    isFromCache = false,
+                    lastUpdateTime = System.currentTimeMillis(),
+                    isCacheValid = true
+                ))
+            } catch (e: Exception) {
+                // В случае ошибки продолжаем использовать кэшированные данные
+            }
+        }
     }.flowOn(Dispatchers.IO)
 
     override suspend fun getLowQuantityMedicines(): List<MedicineEntity> = withContext(Dispatchers.IO) {
-        emptyList() // Implement when quantity field is added
+        try {
+            val medicines = medicineApi.getAllMedicines().filter { it.quantity < 5 }
+            medicines.forEach { medicineDao.insert(it) }
+            medicines
+        } catch (e: Exception) {
+            medicineDao.getLowQuantity().first()
+        }
     }
 } 

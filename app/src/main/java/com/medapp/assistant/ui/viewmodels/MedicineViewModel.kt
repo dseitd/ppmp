@@ -3,8 +3,9 @@ package com.medapp.assistant.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.medapp.assistant.data.cache.CacheManager
-import com.medapp.assistant.data.model.MedicineEntity
+import com.medapp.assistant.data.local.entities.MedicineEntity
 import com.medapp.assistant.data.repository.MedicineRepository
+import com.medapp.assistant.data.model.MedicineCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -46,14 +47,11 @@ class MedicineViewModel @Inject constructor(
                         )
                     }
                 }
-                .collect { (medicines, cacheState) ->
+                .collect { medicines ->
                     _uiState.update { 
                         it.copy(
                             medicines = medicines,
-                            isLoading = false,
-                            isFromCache = cacheState.isFromCache,
-                            lastUpdateTime = cacheState.lastUpdateTime,
-                            isCacheValid = cacheState.isCacheValid
+                            isLoading = false
                         )
                     }
                 }
@@ -73,14 +71,11 @@ class MedicineViewModel @Inject constructor(
                         )
                     }
                 }
-                .collect { (medicines, cacheState) ->
+                .collect { medicines ->
                     _uiState.update { 
                         it.copy(
                             medicines = medicines,
-                            isLoading = false,
-                            isFromCache = cacheState.isFromCache,
-                            lastUpdateTime = cacheState.lastUpdateTime,
-                            isCacheValid = cacheState.isCacheValid
+                            isLoading = false
                         )
                     }
                 }
@@ -92,6 +87,30 @@ class MedicineViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             
             medicineRepository.getMedicinesByTypeFlow(type)
+                .catch { e ->
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false,
+                            error = e.message ?: "Unknown error occurred"
+                        )
+                    }
+                }
+                .collect { medicines ->
+                    _uiState.update { 
+                        it.copy(
+                            medicines = medicines,
+                            isLoading = false
+                        )
+                    }
+                }
+        }
+    }
+
+    fun getExpiringMedicines() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            
+            medicineRepository.getExpiringMedicinesFlow()
                 .catch { e ->
                     _uiState.update { 
                         it.copy(
@@ -114,11 +133,11 @@ class MedicineViewModel @Inject constructor(
         }
     }
 
-    fun getExpiringMedicines() {
+    fun getLowQuantityMedicines() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             
-            medicineRepository.getExpiringMedicinesFlow()
+            medicineRepository.getLowQuantityMedicinesFlow()
                 .catch { e ->
                     _uiState.update { 
                         it.copy(
@@ -211,6 +230,36 @@ class MedicineViewModel @Inject constructor(
         viewModelScope.launch {
             cacheManager.setCacheTtl(ttlMinutes)
             loadMedicines() // Перезагружаем данные с новым TTL
+        }
+    }
+
+    fun filterMedicinesByCategory(category: MedicineCategory?) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            
+            try {
+                val medicines = if (category == null) {
+                    medicineRepository.getAllMedicinesFlow()
+                } else {
+                    medicineRepository.getMedicinesByTypeFlow(category.name)
+                }
+                
+                medicines.collect { result ->
+                    _uiState.update { 
+                        it.copy(
+                            medicines = result,
+                            isLoading = false
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Failed to filter medicines"
+                    )
+                }
+            }
         }
     }
 } 

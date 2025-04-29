@@ -1,12 +1,8 @@
 package com.medapp.assistant.data.model
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 import com.google.gson.annotations.SerializedName
 
-@Entity(tableName = "first_aid_guides")
 data class FirstAidGuide(
-    @PrimaryKey
     @SerializedName("id")
     val id: Long,
 
@@ -17,10 +13,10 @@ data class FirstAidGuide(
     val description: String,
 
     @SerializedName("content")
-    val content: String,
+    val content: String = "",
 
     @SerializedName("imageUrl")
-    val imageUrl: String?,
+    val imageUrl: String? = null,
 
     @SerializedName("category")
     val category: String,

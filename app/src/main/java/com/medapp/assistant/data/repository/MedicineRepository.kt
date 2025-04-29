@@ -1,20 +1,19 @@
 package com.medapp.assistant.data.repository
 
-import com.medapp.assistant.data.model.MedicineEntity
+import com.medapp.assistant.data.local.entities.MedicineEntity
 import kotlinx.coroutines.flow.Flow
 import java.util.Date
 
 interface MedicineRepository {
-    fun getAllMedicinesFlow(): Flow<Pair<List<MedicineEntity>, CacheState>>
+    fun getAllMedicinesFlow(): Flow<List<MedicineEntity>>
     suspend fun getAllMedicines(): List<MedicineEntity>
     
-    fun getMedicineByIdFlow(id: Long): Flow<Pair<MedicineEntity?, CacheState>>
     suspend fun getMedicineById(id: Long): MedicineEntity?
     
-    fun getMedicinesByTypeFlow(type: String): Flow<Pair<List<MedicineEntity>, CacheState>>
+    fun getMedicinesByTypeFlow(type: String): Flow<List<MedicineEntity>>
     suspend fun getMedicinesByType(type: String): List<MedicineEntity>
     
-    fun searchMedicinesFlow(query: String): Flow<Pair<List<MedicineEntity>, CacheState>>
+    fun searchMedicinesFlow(query: String): Flow<List<MedicineEntity>>
     suspend fun searchMedicines(query: String): List<MedicineEntity>
     
     suspend fun addMedicine(medicine: MedicineEntity): MedicineEntity

@@ -206,43 +206,104 @@ private fun QuizResultScreen(
     totalQuestions: Int,
     onFinish: () -> Unit
 ) {
+    val score = (correctAnswers.toFloat() / totalQuestions * 100).toInt()
+    val resultText = when {
+        score >= 90 -> "Отлично!"
+        score >= 70 -> "Хорошо!"
+        score >= 50 -> "Удовлетворительно"
+        else -> "Нужно подготовиться лучше"
+    }
+    
+    val resultColor = when {
+        score >= 90 -> MaterialTheme.colorScheme.primary
+        score >= 70 -> MaterialTheme.colorScheme.secondary
+        score >= 50 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.error
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "Quiz Completed!",
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            text = "You got $correctAnswers out of $totalQuestions questions correct",
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            text = "Score: ${(correctAnswers.toFloat() / totalQuestions * 100).toInt()}%",
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.Center
-        )
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = 6.dp
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Тест завершен!",
+                    style = MaterialTheme.typography.headlineMedium,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Text(
+                    text = resultText,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = resultColor,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Правильных ответов: $correctAnswers из $totalQuestions",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                CircularProgressIndicator(
+                    progress = correctAnswers.toFloat() / totalQuestions,
+                    modifier = Modifier.size(120.dp),
+                    color = resultColor,
+                    strokeWidth = 8.dp
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "$score%",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = resultColor,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
         
         Spacer(modifier = Modifier.height(32.dp))
         
         Button(
             onClick = onFinish,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
         ) {
-            Text("Finish")
+            Text(
+                text = "Завершить",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
         }
     }
 } 

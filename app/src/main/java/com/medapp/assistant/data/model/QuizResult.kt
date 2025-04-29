@@ -1,13 +1,9 @@
 package com.medapp.assistant.data.model
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 import com.google.gson.annotations.SerializedName
-import java.util.Date
 
-@Entity(tableName = "quiz_results")
 data class QuizResult(
-    @PrimaryKey(autoGenerate = true)
+    @SerializedName("id")
     val id: Long = 0,
     
     @SerializedName("quizId")
@@ -29,12 +25,13 @@ data class QuizResult(
     val timeSpent: Int, // in seconds
     
     @SerializedName("completedAt")
-    val completedAt: Date,
+    val completedAt: Long = System.currentTimeMillis(),
+    
+    @SerializedName("isPassed")
+    val isPassed: Boolean,
     
     @SerializedName("answers")
-    val answers: List<Answer>,
-    
-    val isPassed: Boolean = false
+    val answers: List<Answer>
 ) {
     data class Answer(
         @SerializedName("questionId")
@@ -48,6 +45,6 @@ data class QuizResult(
     )
 
     fun getTimestamp(): Long {
-        return completedAt.time
+        return completedAt
     }
 } 

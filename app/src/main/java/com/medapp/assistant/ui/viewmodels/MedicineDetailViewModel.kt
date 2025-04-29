@@ -1,10 +1,16 @@
 package com.medapp.assistant.ui.viewmodels
 
+import android.app.Application
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.medapp.assistant.data.model.MedicineEntity
+import com.medapp.assistant.data.local.entities.MedicineEntity
 import com.medapp.assistant.data.repository.MedicineRepository
+import com.medapp.assistant.data.repository.InventoryRepository
+import com.medapp.assistant.data.local.entities.InventoryItemEntity
+import com.medapp.assistant.data.events.MedicineEvents
+import com.medapp.assistant.MedAssistantApp
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +21,10 @@ import javax.inject.Inject
 @HiltViewModel
 class MedicineDetailViewModel @Inject constructor(
     private val medicineRepository: MedicineRepository,
-    savedStateHandle: SavedStateHandle
+    private val inventoryRepository: InventoryRepository,
+    savedStateHandle: SavedStateHandle,
+    private val application: Application,
+    private val medicineEvents: MedicineEvents
 ) : ViewModel() {
 
     private val medicineId: Long = checkNotNull(savedStateHandle["medicineId"])
@@ -113,12 +122,27 @@ class MedicineDetailViewModel @Inject constructor(
                 usage = _usage.value,
                 dosage = _dosage.value,
                 expiry = _expiry.value,
-                isPersonal = true
+                isPersonal = _isPersonal.value
             )
-            if (isNewMedicine) {
+            
+            val savedMedicine = if (isNewMedicine) {
                 medicineRepository.addMedicine(medicine)
             } else {
                 medicineRepository.updateMedicine(medicine)
+            }
+            
+            // Добавляем медикамент в инвентарь только если он отмечен как личный
+            if (savedMedicine != null && savedMedicine.isPersonal) {
+                val inventoryItem = InventoryItemEntity(
+                    id = savedMedicine.id,
+                    name = savedMedicine.name,
+                    quantity = 1,
+                    expiry = savedMedicine.expiry,
+                    atHome = false // По умолчанию добавляем в "С собой"
+                )
+                inventoryRepository.addInventoryItem(inventoryItem)
+                // Добавляем вызов события для обновления списка
+                medicineEvents.triggerRefreshPersonalMedicines()
             }
         }
     }
@@ -133,14 +157,24 @@ class MedicineDetailViewModel @Inject constructor(
 
     fun togglePersonal() {
         viewModelScope.launch {
-            _medicine.value?.let { medicine ->
-                try {
-                    val updatedMedicine = medicine.copy(isPersonal = !medicine.isPersonal)
-                    medicineRepository.updateMedicine(updatedMedicine)
-                    _medicine.value = updatedMedicine
-                } catch (e: Exception) {
-                    // Handle error
+            try {
+                val currentMedicine = _medicine.value ?: return@launch
+                val updatedMedicine = currentMedicine.copy(isPersonal = !currentMedicine.isPersonal)
+                medicineRepository.updateMedicine(updatedMedicine)
+                _medicine.value = updatedMedicine
+                
+                // Update inventory if needed
+                if (updatedMedicine.isPersonal) {
+                    medicineEvents.triggerRefreshPersonalMedicines()
+                } else {
+                    // Remove from inventory if exists
+                    inventoryRepository.getInventoryItemById(updatedMedicine.id)?.let { item ->
+                        inventoryRepository.deleteInventoryItem(item.id)
+                        medicineEvents.triggerRefreshPersonalMedicines()
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e("MedicineDetailViewModel", "Error toggling personal status", e)
             }
         }
     }

@@ -229,20 +229,6 @@ fun HomeScreen(
     if (showChatSheet) {
         ChatBottomSheet(onDismiss = { showChatSheet = false })
     }
-    // Добавляю подпись Byte Me внизу экрана
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = 24.dp),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Text(
-            text = "Byte Me",
-            color = Color(0xFF3C4670),
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-            textAlign = TextAlign.Center
-        )
-    }
 }
 
 @Composable
