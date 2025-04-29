@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ассистент ППМП</string>
+    
+    <!-- Common -->
+    <string name="back">Назад</string>
+    <string name="loading">Загрузка…</string>
+    <string name="no_data">Нет данных</string>
+    <string name="scroll_to_top">Прокрутить вверх</string>
+    <string name="search">Поиск</string>
+    <string name="previous">Предыдущий</string>
+    <string name="next">Следующий</string>
+    
+    <!-- Dashboard -->
+    <string name="today">Сегодня</string>
+    <string name="my_schedule">Мое расписание</string>
+    <string name="action_required">Требуют действий</string>
+    <string name="for_review">На проверке</string>
+    <string name="sections">Разделы</string>
+    
+    <!-- Navigation -->
+    <string name="medicines">Медикаменты</string>
+    <string name="medicines_description">Управление вашими лекарствами и медикаментами</string>
+    <string name="first_aid">Первая помощь</string>
+    <string name="first_aid_description">Руководства по оказанию первой помощи</string>
+    <string name="quizzes">Тесты</string>
+    <string name="quizzes_description">Проверьте свои знания о первой помощи</string>
+    <string name="medicine_tracker">Отслеживание</string>
+    <string name="medicine_tracker_description">Отслеживайте прием лекарств</string>
+    
+    <!-- First Aid Guide -->
+    <string name="guide_not_found">Руководство не найдено</string>
+    <string name="steps">Шаги</string>
+    <string name="step_number">Шаг %1$d из %2$d</string>
+    <string name="important_step">Важный шаг</string>
+    <string name="save_offline">Сохранить офлайн</string>
+    <string name="remove_from_offline">Удалить из офлайн</string>
+    <string name="steps_count">Шагов: %d</string>
+    <string name="all_categories">Все категории</string>
+    <string name="first_aid_guides">Руководства по первой помощи</string>
+    <string name="step_of_total">Шаг %1$d из %2$d</string>
+    
+    <!-- Medicine -->
+    <string name="medicine_quantity">Количество</string>
+    <string name="medicine_expiry_date">Срок годности</string>
+    <string name="add_to_personal">Добавить в личный список</string>
+    <string name="remove_from_personal">Удалить из личного списка</string>
+    
+    <!-- Notifications -->
+    <string name="notifications">Уведомления</string>
+    <string name="expiring_medicines_count">%d медикаментов скоро истекут</string>
+    <string name="low_quantity_medicines_count">%d медикаментов заканчиваются</string>
+</resources>
